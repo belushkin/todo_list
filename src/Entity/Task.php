@@ -3,7 +3,12 @@
 namespace App\Entity;
 
 use ApiPlatform\Core\Annotation\ApiResource;
+use ApiPlatform\Core\Annotation\ApiFilter;
 use Symfony\Component\Serializer\Annotation\Groups;
+use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\BooleanFilter;
+use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\DateFilter;
+use Symfony\Component\Validator\Constraints as Assert;
 use App\Repository\TaskRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Carbon\Carbon;
@@ -12,11 +17,17 @@ use Carbon\Carbon;
  * @ApiResource(
  *      collectionOperations={"get", "post"},
  *      itemOperations={"get", "put"},
- *      normalizationContext={"groups"={"task:read"}},
+ *      normalizationContext={"groups"={"task:read"}, "datetime_format" = "Y-m-d H:i:s"},
  *      denormalizationContext={"groups"={"task:write"}},
- *      shortName="tasks"
+ *      shortName="tasks",
+ *      attributes={
+ *          "pagination_items_per_page"=10
+ *      }
  * )
  * @ORM\Entity(repositoryClass=TaskRepository::class)
+ * @ApiFilter(BooleanFilter::class, properties={"isPublished"})
+ * @ApiFilter(SearchFilter::class, properties={"title": "partial", "description": "partial"})
+ * @ApiFilter(DateFilter::class, properties={"createdAt"})
  */
 class Task
 {
@@ -30,18 +41,27 @@ class Task
     /**
      * @ORM\Column(type="string", length=255)
      * @Groups({"task:read", "task:write"})
+     * @Assert\NotBlank()
      */
     private $title;
 
     /**
      * @ORM\Column(type="text")
      * @Groups({"task:read", "task:write"})
+     * @Assert\NotBlank()
+     * @Assert\Length(
+     *  min=2,
+     *  max=50,
+     *  maxMessage="Describe your task in 50 characters"
+     * )
      */
     private $description;
 
     /**
      * @ORM\Column(type="datetime")
      * @Groups({"task:read", "task:write"})
+     * @Assert\NotBlank()
+     * @Assert\Type("\DateTimeInterface")
      */
     private $time;
 
@@ -55,8 +75,14 @@ class Task
      */
     private $isPublished = false;
 
+    /**
+     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="tasks")
+     * @ORM\JoinColumn(nullable=false)
+     */
+    private $owner;
+
     
-    public function __construct(string $title, string $description, \DateTime $time) {
+    public function __construct(string $title = null, string $description = null, \DateTime $time = null) {
         $this->title = $title;
         $this->description = $description;
         $this->time = $time;
@@ -107,6 +133,18 @@ class Task
     public function setIsPublished(bool $isPublished): self
     {
         $this->isPublished = $isPublished;
+
+        return $this;
+    }
+
+    public function getOwner(): ?User
+    {
+        return $this->owner;
+    }
+
+    public function setOwner(?User $owner): self
+    {
+        $this->owner = $owner;
 
         return $this;
     }
