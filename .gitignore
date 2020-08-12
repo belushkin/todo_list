@@ -17,4 +17,7 @@
 /nbproject
 /nbproject/private/
 data/
-/api/vendor/
+/client/todo_list/nbproject/private/
+/web/nbproject/private/
+/web/vendor/
+/web/var/

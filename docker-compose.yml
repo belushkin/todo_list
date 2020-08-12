@@ -1,12 +1,18 @@
-version: '2'
+version: '3.3'
+
 services:
   web:
-    build: .
-    ports:
-      - "8000:8000"
+    build: ./web
+    image: web
+    container_name: web
+    command: symfony server:start
     volumes:
-      - .:/app
-    links:
+      - ./web/:/app/
+    # expose:
+    #   - 5000
+    ports:
+      - 8002:8000
+    depends_on:
       - db-mysql
 
   db-mysql:
@@ -19,8 +25,39 @@ services:
       - $VOLUME_DIR/data/volume/mysql:/var/lib/mysql
       - $VOLUME_DIR/data/volume/logs/mysql:/var/log/mysql
 
-  adminer:
-    image: adminer
-    restart: on-failure
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - 8080:8080
+    depends_on:
+      - web
+      - client
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    volumes:
+      - './client:/app'
+      - '/app/node_modules'
+    ports:
+      - 3008:3000
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_SERVICE_URL=http://localhost:8080
+      - REACT_APP_SERVER_SERVICE_URL = http://todolist_nginx_1:8080
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - web
+
+volumes:
+  data:
+
+  # adminer:
+  #   image: adminer
+  #   restart: on-failure
+  #   ports:
+  #     - "8080:8080"
