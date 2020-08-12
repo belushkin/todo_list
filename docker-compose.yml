@@ -1,63 +1,59 @@
-version: '3.3'
+version: '3.4'
 
 services:
-  web:
-    build: ./web
-    image: web
-    container_name: web
-    command: symfony server:start
-    volumes:
-      - ./web/:/app/
-    # expose:
-    #   - 5000
-    ports:
-      - 8002:8000
-    depends_on:
-      - db-mysql
-
-  db-mysql:
-    image: "mysql:5.7"
-    restart: on-failure
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: docler
-    volumes:
-      - $VOLUME_DIR/data/volume/mysql:/var/lib/mysql
-      - $VOLUME_DIR/data/volume/logs/mysql:/var/log/mysql
-
-  nginx:
+  
+  php:
     build:
-      context: ./nginx
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - 8080:8080
+      context: ./api
+      target: api_platform_php
+    image: api
     depends_on:
-      - web
-      - client
+      - db
+    volumes:
+      - ./api:/srv/api:rw
+      - ./api/docker/php/conf.d/api-platform.dev.ini:/usr/local/etc/php/conf.d/api-platform.ini
+      - ./api/var:/srv/api/var:rw
+  
+  api:
+    build:
+      context: ./api
+      target: api_platform_nginx
+    image: nginx
+    depends_on:
+      - php
+    volumes:
+      - ./api/public:/srv/api/public:ro
+
+  db:
+    image: postgres:12-alpine
+    environment:
+      - POSTGRES_DB=docler
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=root
+    volumes:
+      - data:/var/lib/postgresql/data:rw
+      # you may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
+      # - ./api/docker/db/data:/var/lib/postgresql/data:rw
+    ports:
+      - target: 5432
+        published: 5432
+        protocol: tcp
 
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile
-    volumes:
-      - './client:/app'
-      - '/app/node_modules'
-    ports:
-      - 3008:3000
+      target: api_platform_client_development
+    image: client
+    tty: true # https://github.com/facebook/create-react-app/issues/8688
     environment:
-      - NODE_ENV=development
-      - REACT_APP_SERVICE_URL=http://localhost:8080
-      - REACT_APP_SERVER_SERVICE_URL = http://todolist_nginx_1:8080
-      - CHOKIDAR_USEPOLLING=true
-    depends_on:
-      - web
+      - API_PLATFORM_CLIENT_GENERATOR_ENTRYPOINT=http://api
+      - API_PLATFORM_CLIENT_GENERATOR_OUTPUT=src
+    volumes:
+      - ./client:/usr/src/client:rw
+    ports:
+      - target: 3000
+        published: 80
+        protocol: tcp
 
 volumes:
-  data:
-
-  # adminer:
-  #   image: adminer
-  #   restart: on-failure
-  #   ports:
-  #     - "8080:8080"
+  data: {}
