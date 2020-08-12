@@ -12,17 +12,9 @@
 namespace Symfony\Flex;
 
 use Composer\Composer;
-use Composer\Config\JsonConfigSource;
-use Composer\DependencyResolver\Pool;
 use Composer\Factory;
-use Composer\IO\IOInterface;
 use Composer\Json\JsonFile;
 use Composer\Json\JsonManipulator;
-use Composer\Package\Locker;
-use Composer\Package\Version\VersionSelector;
-use Composer\Plugin\PluginInterface;
-use Composer\Repository\CompositeRepository;
-use Composer\Repository\RepositorySet;
 use Symfony\Flex\Unpack\Operation;
 use Symfony\Flex\Unpack\Result;
 
@@ -30,28 +22,20 @@ class Unpacker
 {
     private $composer;
     private $resolver;
-    private $dryRun;
-    private $jsonPath;
-    private $manipulator;
 
-    public function __construct(Composer $composer, PackageResolver $resolver, bool $dryRun)
+    public function __construct(Composer $composer, PackageResolver $resolver)
     {
         $this->composer = $composer;
         $this->resolver = $resolver;
-        $this->dryRun = $dryRun;
     }
 
-    public function unpack(Operation $op, Result $result = null): Result
+    public function unpack(Operation $op): Result
     {
-        if (null === $result) {
-            $result = new Result();
-            $this->jsonPath = Factory::getComposerFile();
-            $this->manipulator = new JsonManipulator(file_get_contents($this->jsonPath));
-        }
-
-        $localRepo = $this->composer->getRepositoryManager()->getLocalRepository();
+        $result = new Result();
+        $json = new JsonFile(Factory::getComposerFile());
+        $manipulator = new JsonManipulator(file_get_contents($json->getPath()));
         foreach ($op->getPackages() as $package) {
-            $pkg = $localRepo->findPackage($package['name'], $package['version'] ?: '*');
+            $pkg = $this->composer->getRepositoryManager()->getLocalRepository()->findPackage($package['name'], $package['version'] ?: '*');
             $pkg = $pkg ?? $this->composer->getRepositoryManager()->findPackage($package['name'], $package['version'] ?: '*');
 
             // not unpackable or no --unpack flag or empty packs (markers)
@@ -66,11 +50,7 @@ class Unpacker
                 continue;
             }
 
-            if (!$result->addUnpacked($pkg)) {
-                continue;
-            }
-
-            $versionSelector = null;
+            $result->addUnpacked($pkg);
             foreach ($pkg->getRequires() as $link) {
                 if ('php' === $link->getTarget()) {
                     continue;
@@ -79,75 +59,14 @@ class Unpacker
                 $constraint = $link->getPrettyConstraint();
                 $constraint = substr($this->resolver->parseVersion($link->getTarget(), $constraint, !$package['dev']), 1) ?: $constraint;
 
-                if ($subPkg = $localRepo->findPackage($link->getTarget(), '*')) {
-                    if ('symfony-pack' === $subPkg->getType()) {
-                        $subOp = new Operation(true, $op->shouldSort());
-                        $subOp->addPackage($subPkg->getName(), $constraint, $package['dev']);
-                        $result = $this->unpack($subOp, $result);
-                        continue;
-                    }
-
-                    if ('*' === $constraint) {
-                        if (null === $versionSelector) {
-                            $pool = class_exists(RepositorySet::class) ? RepositorySet::class : Pool::class;
-                            $pool = new $pool($this->composer->getPackage()->getMinimumStability(), $this->composer->getPackage()->getStabilityFlags());
-                            $pool->addRepository(new CompositeRepository($this->composer->getRepositoryManager()->getRepositories()));
-                            $versionSelector = new VersionSelector($pool);
-                        }
-
-                        $constraint = $versionSelector->findRecommendedRequireVersion($subPkg);
-                    }
-                }
-
-                if (!$this->manipulator->addLink($package['dev'] ? 'require-dev' : 'require', $link->getTarget(), $constraint, $op->shouldSort())) {
+                if (!$manipulator->addLink($package['dev'] ? 'require-dev' : 'require', $link->getTarget(), $constraint, $op->shouldSort())) {
                     throw new \RuntimeException(sprintf('Unable to unpack package "%s".', $link->getTarget()));
                 }
             }
         }
 
-        if (!$this->dryRun && 1 === \func_num_args()) {
-            file_put_contents($this->jsonPath, $this->manipulator->getContents());
-        }
+        file_put_contents($json->getPath(), $manipulator->getContents());
 
         return $result;
-    }
-
-    public function updateLock(Result $result, IOInterface $io): void
-    {
-        $json = new JsonFile(Factory::getComposerFile());
-        $manipulator = new JsonConfigSource($json);
-        $locker = $this->composer->getLocker();
-        $lockData = $locker->getLockData();
-
-        foreach ($result->getUnpacked() as $package) {
-            $manipulator->removeLink('require-dev', $package->getName());
-            foreach ($lockData['packages-dev'] as $i => $pkg) {
-                if ($package->getName() === $pkg['name']) {
-                    unset($lockData['packages-dev'][$i]);
-                }
-            }
-            $manipulator->removeLink('require', $package->getName());
-            foreach ($lockData['packages'] as $i => $pkg) {
-                if ($package->getName() === $pkg['name']) {
-                    unset($lockData['packages'][$i]);
-                }
-            }
-        }
-        $lockData['packages'] = array_values($lockData['packages']);
-        $lockData['packages-dev'] = array_values($lockData['packages-dev']);
-        $lockData['content-hash'] = $locker->getContentHash(file_get_contents($json->getPath()));
-        $lockFile = new JsonFile(substr($json->getPath(), 0, -4).'lock', null, $io);
-
-        if (!$this->dryRun) {
-            $lockFile->write($lockData);
-        }
-
-        // force removal of files under vendor/
-        if (version_compare('2.0.0', PluginInterface::PLUGIN_API_VERSION, '>')) {
-            $locker = new Locker($io, $lockFile, $this->composer->getRepositoryManager(), $this->composer->getInstallationManager(), file_get_contents($json->getPath()));
-        } else {
-            $locker = new Locker($io, $lockFile, $this->composer->getInstallationManager(), file_get_contents($json->getPath()));
-        }
-        $this->composer->setLocker($locker);
     }
 }

@@ -20,7 +20,7 @@ namespace Symfony\Component\HttpClient\Internal;
  */
 final class CurlClientState extends ClientState
 {
-    /** @var \CurlMultiHandle|resource */
+    /** @var resource */
     public $handle;
     /** @var PushedResponse[] */
     public $pushedResponses = [];

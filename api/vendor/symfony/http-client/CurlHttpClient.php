@@ -13,6 +13,7 @@ namespace Symfony\Component\HttpClient;
 
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpClient\Exception\InvalidArgumentException;
 use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\Internal\CurlClientState;
@@ -70,7 +71,7 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
             [, $this->defaultOptions] = self::prepareRequest(null, null, $defaultOptions, $this->defaultOptions);
         }
 
-        $this->multi = new CurlClientState();
+        $this->multi = $multi = new CurlClientState();
         self::$curlVersion = self::$curlVersion ?? curl_version();
 
         // Don't enable HTTP/1.1 pipelining: it forces responses to be sent in order
@@ -94,8 +95,10 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
             return;
         }
 
-        curl_multi_setopt($this->multi->handle, CURLMOPT_PUSHFUNCTION, function ($parent, $pushed, array $requestHeaders) use ($maxPendingPushes) {
-            return $this->handlePush($parent, $pushed, $requestHeaders, $maxPendingPushes);
+        $logger = &$this->logger;
+
+        curl_multi_setopt($this->multi->handle, CURLMOPT_PUSHFUNCTION, static function ($parent, $pushed, array $requestHeaders) use ($multi, $maxPendingPushes, &$logger) {
+            return self::handlePush($parent, $pushed, $requestHeaders, $multi, $maxPendingPushes, $logger);
         });
     }
 
@@ -138,12 +141,12 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
             CURLOPT_CERTINFO => $options['capture_peer_cert_chain'],
         ];
 
-        if (1.0 === (float) $options['http_version']) {
+        if (\defined('CURL_VERSION_HTTP2') && (CURL_VERSION_HTTP2 & self::$curlVersion['features']) && ('https:' === $scheme || 2.0 === (float) $options['http_version'])) {
+            $curlopts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_2_0;
+        } elseif (1.0 === (float) $options['http_version']) {
             $curlopts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_1_0;
         } elseif (1.1 === (float) $options['http_version']) {
             $curlopts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_1_1;
-        } elseif (\defined('CURL_VERSION_HTTP2') && (CURL_VERSION_HTTP2 & self::$curlVersion['features']) && ('https:' === $scheme || 2.0 === (float) $options['http_version'])) {
-            $curlopts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_2_0;
         }
 
         if (isset($options['auth_ntlm'])) {
@@ -160,7 +163,7 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
             }
 
             if (!\is_string($options['auth_ntlm'])) {
-                throw new InvalidArgumentException(sprintf('Option "auth_ntlm" must be a string or an array, "%s" given.', get_debug_type($options['auth_ntlm'])));
+                throw new InvalidArgumentException(sprintf('Option "auth_ntlm" must be a string or an array, "%s" given.', \gettype($options['auth_ntlm'])));
             }
 
             $curlopts[CURLOPT_USERPWD] = $options['auth_ntlm'];
@@ -316,7 +319,7 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
         if ($responses instanceof CurlResponse) {
             $responses = [$responses];
         } elseif (!is_iterable($responses)) {
-            throw new \TypeError(sprintf('"%s()" expects parameter 1 to be an iterable of CurlResponse objects, "%s" given.', __METHOD__, get_debug_type($responses)));
+            throw new \TypeError(sprintf('"%s()" expects parameter 1 to be an iterable of CurlResponse objects, "%s" given.', __METHOD__, \is_object($responses) ? \get_class($responses) : \gettype($responses)));
         }
 
         $active = 0;
@@ -337,7 +340,7 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
         $this->multi->dnsCache->evictions = $this->multi->dnsCache->evictions ?: $this->multi->dnsCache->removals;
         $this->multi->dnsCache->removals = $this->multi->dnsCache->hostnames = [];
 
-        if (\is_resource($this->multi->handle) || $this->multi->handle instanceof \CurlMultiHandle) {
+        if (\is_resource($this->multi->handle)) {
             if (\defined('CURLMOPT_PUSHFUNCTION')) {
                 curl_multi_setopt($this->multi->handle, CURLMOPT_PUSHFUNCTION, null);
             }
@@ -347,7 +350,7 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
         }
 
         foreach ($this->multi->openHandles as [$ch]) {
-            if (\is_resource($ch) || $ch instanceof \CurlHandle) {
+            if (\is_resource($ch)) {
                 curl_setopt($ch, CURLOPT_VERBOSE, false);
             }
         }
@@ -358,7 +361,7 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
         $this->reset();
     }
 
-    private function handlePush($parent, $pushed, array $requestHeaders, int $maxPendingPushes): int
+    private static function handlePush($parent, $pushed, array $requestHeaders, CurlClientState $multi, int $maxPendingPushes, ?LoggerInterface $logger): int
     {
         $headers = [];
         $origin = curl_getinfo($parent, CURLINFO_EFFECTIVE_URL);
@@ -370,7 +373,7 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
         }
 
         if (!isset($headers[':method']) || !isset($headers[':scheme']) || !isset($headers[':authority']) || !isset($headers[':path'])) {
-            $this->logger && $this->logger->debug(sprintf('Rejecting pushed response from "%s": pushed headers are invalid', $origin));
+            $logger && $logger->debug(sprintf('Rejecting pushed response from "%s": pushed headers are invalid', $origin));
 
             return CURL_PUSH_DENY;
         }
@@ -381,21 +384,21 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
         // but this is a MUST in the HTTP/2 RFC; let's restrict pushes to the original host,
         // ignoring domains mentioned as alt-name in the certificate for now (same as curl).
         if (0 !== strpos($origin, $url.'/')) {
-            $this->logger && $this->logger->debug(sprintf('Rejecting pushed response from "%s": server is not authoritative for "%s"', $origin, $url));
+            $logger && $logger->debug(sprintf('Rejecting pushed response from "%s": server is not authoritative for "%s"', $origin, $url));
 
             return CURL_PUSH_DENY;
         }
 
-        if ($maxPendingPushes <= \count($this->multi->pushedResponses)) {
-            $fifoUrl = key($this->multi->pushedResponses);
-            unset($this->multi->pushedResponses[$fifoUrl]);
-            $this->logger && $this->logger->debug(sprintf('Evicting oldest pushed response: "%s"', $fifoUrl));
+        if ($maxPendingPushes <= \count($multi->pushedResponses)) {
+            $fifoUrl = key($multi->pushedResponses);
+            unset($multi->pushedResponses[$fifoUrl]);
+            $logger && $logger->debug(sprintf('Evicting oldest pushed response: "%s"', $fifoUrl));
         }
 
         $url .= $headers[':path'][0];
-        $this->logger && $this->logger->debug(sprintf('Queueing pushed response: "%s"', $url));
+        $logger && $logger->debug(sprintf('Queueing pushed response: "%s"', $url));
 
-        $this->multi->pushedResponses[$url] = new PushedResponse(new CurlResponse($this->multi, $pushed), $headers, $this->multi->openHandles[(int) $parent][1] ?? [], $pushed);
+        $multi->pushedResponses[$url] = new PushedResponse(new CurlResponse($multi, $pushed), $headers, $multi->openHandles[(int) $parent][1] ?? [], $pushed);
 
         return CURL_PUSH_OK;
     }
@@ -436,7 +439,7 @@ final class CurlHttpClient implements HttpClientInterface, LoggerAwareInterface,
     {
         if (!$eof && \strlen($buffer) < $length) {
             if (!\is_string($data = $body($length))) {
-                throw new TransportException(sprintf('The return value of the "body" option callback must be a string, "%s" returned.', get_debug_type($data)));
+                throw new TransportException(sprintf('The return value of the "body" option callback must be a string, "%s" returned.', \gettype($data)));
             }
 
             $buffer .= $data;

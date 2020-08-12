@@ -60,10 +60,16 @@ class Cache extends BaseCache
             }
 
             foreach ($versions as $version => $composerJson) {
-                if (null !== $alias = $composerJson['extra']['branch-alias'][$version] ?? null) {
-                    $normalizedVersion = $this->versionParser->normalize($alias);
-                } elseif (null === $normalizedVersion = $composerJson['version_normalized'] ?? null) {
+                if ('dev-master' === $version) {
+                    if (null === $devMasterAlias = $versions['dev-master']['extra']['branch-alias']['dev-master'] ?? null) {
+                        continue;
+                    }
+
+                    $normalizedVersion = $this->versionParser->normalize($devMasterAlias);
+                } elseif (!isset($composerJson['version_normalized'])) {
                     continue;
+                } else {
+                    $normalizedVersion = $composerJson['version_normalized'];
                 }
 
                 if (!$this->symfonyConstraints->matches(new Constraint('==', $normalizedVersion))) {
@@ -83,10 +89,12 @@ class Cache extends BaseCache
         }
 
         foreach ($symfonySymfony as $version => $composerJson) {
-            if (null !== $alias = $composerJson['extra']['branch-alias'][$version] ?? null) {
-                $normalizedVersion = $this->versionParser->normalize($alias);
-            } elseif (null === $normalizedVersion = $composerJson['version_normalized'] ?? null) {
+            if ('dev-master' === $version) {
+                $normalizedVersion = $this->versionParser->normalize($composerJson['extra']['branch-alias']['dev-master']);
+            } elseif (!isset($composerJson['version_normalized'])) {
                 continue;
+            } else {
+                $normalizedVersion = $composerJson['version_normalized'];
             }
 
             if (!$this->symfonyConstraints->matches(new Constraint('==', $normalizedVersion))) {

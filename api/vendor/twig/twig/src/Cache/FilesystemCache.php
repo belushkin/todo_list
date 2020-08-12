@@ -38,7 +38,7 @@ class FilesystemCache implements CacheInterface
 
     public function load(string $key): void
     {
-        if (is_file($key)) {
+        if (file_exists($key)) {
             @include_once $key;
         }
     }
@@ -78,7 +78,7 @@ class FilesystemCache implements CacheInterface
 
     public function getTimestamp(string $key): int
     {
-        if (!is_file($key)) {
+        if (!file_exists($key)) {
             return 0;
         }
 

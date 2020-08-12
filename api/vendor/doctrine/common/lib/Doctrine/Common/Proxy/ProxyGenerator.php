@@ -1,10 +1,10 @@
 <?php
 namespace Doctrine\Common\Proxy;
 
+use Doctrine\Persistence\Mapping\ClassMetadata;
 use Doctrine\Common\Proxy\Exception\InvalidArgumentException;
 use Doctrine\Common\Proxy\Exception\UnexpectedValueException;
 use Doctrine\Common\Util\ClassUtils;
-use Doctrine\Persistence\Mapping\ClassMetadata;
 use function array_map;
 use function method_exists;
 
@@ -14,6 +14,8 @@ use function method_exists;
  *
  * @author Marco Pivetta <ocramius@gmail.com>
  * @since  2.4
+ *
+ * @deprecated The Doctrine\Common\Proxy component is deprecated, please use ocramius/proxy-manager instead.
  */
 class ProxyGenerator
 {
@@ -431,24 +433,14 @@ EOT;
         $hasParentGet         = false;
         $returnReference      = '';
         $inheritDoc           = '';
-        $name                 = '$name';
-        $parametersString     = '$name';
-        $returnTypeHint       = null;
 
         if ($reflectionClass->hasMethod('__get')) {
-            $hasParentGet     = true;
-            $inheritDoc       = '{@inheritDoc}';
-            $methodReflection = $reflectionClass->getMethod('__get');
+            $hasParentGet = true;
+            $inheritDoc   = '{@inheritDoc}';
 
-            if ($methodReflection->returnsReference()) {
+            if ($reflectionClass->getMethod('__get')->returnsReference()) {
                 $returnReference = '& ';
             }
-
-            $methodParameters = $methodReflection->getParameters();
-            $name             = '$' . $methodParameters[0]->getName();
-
-            $parametersString = $this->buildParametersString($methodReflection->getParameters(), ['name']);
-            $returnTypeHint   = $this->getMethodReturnType($methodReflection);
         }
 
         if (empty($lazyPublicProperties) && ! $hasParentGet) {
@@ -460,7 +452,7 @@ EOT;
      * $inheritDoc
      * @param string \$name
      */
-    public function {$returnReference}__get($parametersString)$returnTypeHint
+    public function {$returnReference}__get(\$name)
     {
 
 EOT;
@@ -469,16 +461,8 @@ EOT;
             $magicGet .= <<<'EOT'
         if (\array_key_exists($name, self::$lazyPropertiesNames)) {
             $this->__initializer__ && $this->__initializer__->__invoke($this, '__get', [$name]);
-EOT;
 
-            if ($returnTypeHint === ': void') {
-                $magicGet .= "\n            return;";
-            } else {
-                $magicGet .= "\n            return \$this->\$name;";
-            }
-
-            $magicGet .= <<<'EOT'
-
+            return $this->$name;
         }
 
 
@@ -488,29 +472,20 @@ EOT;
         if ($hasParentGet) {
             $magicGet .= <<<'EOT'
         $this->__initializer__ && $this->__initializer__->__invoke($this, '__get', [$name]);
-EOT;
-
-            if ($returnTypeHint === ': void') {
-                $magicGet .= <<<'EOT'
-
-        parent::__get($name);
-        return;
-EOT;
-            } else {
-                $magicGet .= <<<'EOT'
 
         return parent::__get($name);
-EOT;
-            }
-        } else {
-            $magicGet .= sprintf(<<<EOT
-        trigger_error(sprintf('Undefined property: %%s::$%%s', __CLASS__, %s), E_USER_NOTICE);
 
-EOT
-                , $name);
+EOT;
+        } else {
+            $magicGet .= <<<'EOT'
+        trigger_error(sprintf('Undefined property: %s::$%s', __CLASS__, $name), E_USER_NOTICE);
+
+EOT;
         }
 
-        return $magicGet . "\n    }";
+        $magicGet .= "    }";
+
+        return $magicGet;
     }
 
     /**
@@ -524,31 +499,22 @@ EOT
     {
         $lazyPublicProperties = $this->getLazyLoadedPublicPropertiesNames($class);
         $hasParentSet         = $class->getReflectionClass()->hasMethod('__set');
-        $parametersString     = '$name, $value';
-        $returnTypeHint       = null;
-
-        if ($hasParentSet) {
-            $methodReflection = $class->getReflectionClass()->getMethod('__set');
-            $parametersString = $this->buildParametersString($methodReflection->getParameters(), ['name', 'value']);
-            $returnTypeHint   = $this->getMethodReturnType($methodReflection);
-        }
 
         if (empty($lazyPublicProperties) && ! $hasParentSet) {
             return '';
         }
 
         $inheritDoc = $hasParentSet ? '{@inheritDoc}' : '';
-        $magicSet   = sprintf(<<<'EOT'
+        $magicSet   = <<<EOT
     /**
-     * %s
-     * @param string $name
-     * @param mixed  $value
+     * $inheritDoc
+     * @param string \$name
+     * @param mixed  \$value
      */
-    public function __set(%s)%s
+    public function __set(\$name, \$value)
     {
 
-EOT
-            , $inheritDoc, $parametersString, $returnTypeHint);
+EOT;
 
         if ( ! empty($lazyPublicProperties)) {
             $magicSet .= <<<'EOT'
@@ -574,7 +540,9 @@ EOT;
             $magicSet .= "        \$this->\$name = \$value;";
         }
 
-        return $magicSet . "\n    }";
+        $magicSet .= "\n    }";
+
+        return $magicSet;
     }
 
     /**
@@ -588,14 +556,6 @@ EOT;
     {
         $lazyPublicProperties = $this->getLazyLoadedPublicPropertiesNames($class);
         $hasParentIsset       = $class->getReflectionClass()->hasMethod('__isset');
-        $parametersString     = '$name';
-        $returnTypeHint       = null;
-
-        if ($hasParentIsset) {
-            $methodReflection = $class->getReflectionClass()->getMethod('__isset');
-            $parametersString = $this->buildParametersString($methodReflection->getParameters(), ['name']);
-            $returnTypeHint   = $this->getMethodReturnType($methodReflection);
-        }
 
         if (empty($lazyPublicProperties) && ! $hasParentIsset) {
             return '';
@@ -608,7 +568,7 @@ EOT;
      * @param  string \$name
      * @return boolean
      */
-    public function __isset($parametersString)$returnTypeHint
+    public function __isset(\$name)
     {
 
 EOT;
@@ -630,6 +590,7 @@ EOT;
         $this->__initializer__ && $this->__initializer__->__invoke($this, '__isset', [$name]);
 
         return parent::__isset($name);
+
 EOT;
         } else {
             $magicIsset .= "        return false;";
@@ -979,18 +940,15 @@ EOT;
 
     /**
      * @param \ReflectionParameter[] $parameters
-     * @param string[]               $renameParameters
      *
      * @return string
      */
-    private function buildParametersString(array $parameters, array $renameParameters = [])
+    private function buildParametersString(array $parameters)
     {
         $parameterDefinitions = [];
 
         /* @var $param \ReflectionParameter */
-        $i = -1;
         foreach ($parameters as $param) {
-            $i++;
             $parameterDefinition = '';
 
             if ($parameterType = $this->getParameterType($param)) {
@@ -1005,7 +963,7 @@ EOT;
                 $parameterDefinition .= '...';
             }
 
-            $parameterDefinition .= '$' . ($renameParameters ? $renameParameters[$i] : $param->getName());
+            $parameterDefinition .= '$' . $param->getName();
 
             if ($param->isDefaultValueAvailable()) {
                 $parameterDefinition .= ' = ' . var_export($param->getDefaultValue(), true);

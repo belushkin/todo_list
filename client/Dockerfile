@@ -1,3 +1,7 @@
+# https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage
+# https://docs.docker.com/compose/compose-file/#target
+
+
 # https://docs.docker.com/engine/reference/builder/#understand-how-arg-and-from-interact
 ARG NODE_VERSION=13
 ARG NGINX_VERSION=1.17
@@ -19,7 +23,7 @@ COPY . ./
 
 VOLUME /usr/src/client/node_modules
 
-# ENV HTTPS true
+ENV HTTPS true
 
 CMD ["yarn", "start"]
 

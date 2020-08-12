@@ -33,9 +33,5 @@ class AddExpressionLanguageProvidersPass implements CompilerPassInterface
                 $definition->addMethodCall('registerProvider', [new Reference($id)]);
             }
         }
-
-        if (!$container->hasDefinition('cache.system')) {
-            $container->removeDefinition('cache.security_expression_language');
-        }
     }
 }

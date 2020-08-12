@@ -54,12 +54,6 @@ final class HttplugPromise implements HttplugPromiseInterface
      */
     public function wait($unwrap = true)
     {
-        $result = $this->promise->wait($unwrap);
-
-        while ($result instanceof HttplugPromiseInterface || $result instanceof GuzzlePromiseInterface) {
-            $result = $result->wait($unwrap);
-        }
-
-        return $result;
+        return $this->promise->wait($unwrap);
     }
 }

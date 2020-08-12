@@ -178,45 +178,6 @@ final class ClassSourceManipulator
         $this->updateSourceCodeFromNewStmts();
     }
 
-    /**
-     * @param string $trait the fully-qualified trait name
-     */
-    public function addTrait(string $trait)
-    {
-        $importedClassName = $this->addUseStatementIfNecessary($trait);
-
-        /** @var Node\Stmt\TraitUse[] $traitNodes */
-        $traitNodes = $this->findAllNodes(function ($node) {
-            return $node instanceof Node\Stmt\TraitUse;
-        });
-
-        foreach ($traitNodes as $node) {
-            if ($node->traits[0]->toString() === $importedClassName) {
-                return;
-            }
-        }
-
-        $traitNodes[] = new Node\Stmt\TraitUse([new Node\Name($importedClassName)]);
-
-        $classNode = $this->getClassNode();
-
-        if (!empty($classNode->stmts) && 1 === \count($traitNodes)) {
-            $traitNodes[] = $this->createBlankLineNode(self::CONTEXT_CLASS);
-        }
-
-        // avoid all the use traits in class for unshift all the new UseTrait
-        // in the right order.
-        foreach ($classNode->stmts as $key => $node) {
-            if ($node instanceof Node\Stmt\TraitUse) {
-                unset($classNode->stmts[$key]);
-            }
-        }
-
-        array_unshift($classNode->stmts, ...$traitNodes);
-
-        $this->updateSourceCodeFromNewStmts();
-    }
-
     public function addAccessorMethod(string $propertyName, string $methodName, $returnType, bool $isReturnTypeNullable, array $commentLines = [], $typeCast = null)
     {
         $this->addCustomGetter($propertyName, $methodName, $returnType, $isReturnTypeNullable, $commentLines, $typeCast);
@@ -236,36 +197,8 @@ final class ClassSourceManipulator
         $this->addMethod($builder->getNode());
     }
 
-    /**
-     * @param Node[] $params
-     */
-    public function addConstructor(array $params, string $methodBody)
+    public function addMethodBuilder(Builder\Method $methodBuilder)
     {
-        if (null !== $this->getConstructorNode()) {
-            throw new \LogicException('Constructor already exists.');
-        }
-
-        $methodBuilder = $this->createMethodBuilder('__construct', null, false);
-
-        $this->addMethodParams($methodBuilder, $params);
-
-        $this->addMethodBody($methodBuilder, $methodBody);
-
-        $this->addNodeAfterProperties($methodBuilder->getNode());
-        $this->updateSourceCodeFromNewStmts();
-    }
-
-    /**
-     * @param Node[] $params
-     */
-    public function addMethodBuilder(Builder\Method $methodBuilder, array $params = [], string $methodBody = null)
-    {
-        $this->addMethodParams($methodBuilder, $params);
-
-        if ($methodBody) {
-            $this->addMethodBody($methodBuilder, $methodBody);
-        }
-
         $this->addMethod($methodBuilder->getNode());
     }
 
@@ -282,9 +215,6 @@ final class ClassSourceManipulator
         ;
 
         if (null !== $returnType) {
-            if (class_exists($returnType) || interface_exists($returnType)) {
-                $returnType = $this->addUseStatementIfNecessary($returnType);
-            }
             $methodNodeBuilder->setReturnType($isReturnTypeNullable ? new Node\NullableType($returnType) : $returnType);
         }
 
@@ -508,20 +438,15 @@ final class ClassSourceManipulator
                 'nullable' => false,
             ]);
         }
-
         $this->addProperty($relation->getPropertyName(), $annotations);
 
         $this->addGetter(
             $relation->getPropertyName(),
-            $relation->getCustomReturnType() ?: $typeHint,
+            $typeHint,
             // getter methods always have nullable return values
-            // unless this has been customized explicitly
-            $relation->getCustomReturnType() ? $relation->isCustomReturnTypeNullable() : true
+            // because even though these are required in the db, they may not be set
+            true
         );
-
-        if ($relation->shouldAvoidSetter()) {
-            return;
-        }
 
         $setterNodeBuilder = $this->createSetterNodeBuilder(
             $relation->getPropertyName(),
@@ -942,19 +867,6 @@ final class ClassSourceManipulator
         return false === $node ? null : $node;
     }
 
-    /**
-     * @return Node[]
-     */
-    private function findAllNodes(callable $filterCallback): array
-    {
-        $traverser = new NodeTraverser();
-        $visitor = new NodeVisitor\FindingVisitor($filterCallback);
-        $traverser->addVisitor($visitor);
-        $traverser->traverse($this->newStmts);
-
-        return $visitor->getFoundNodes();
-    }
-
     private function createBlankLineNode(string $context)
     {
         switch ($context) {
@@ -1147,13 +1059,6 @@ final class ClassSourceManipulator
             }, [$classNode]);
         }
 
-        // otherwise, try to add after the last trait
-        if (!$targetNode) {
-            $targetNode = $this->findLastNode(function ($node) {
-                return $node instanceof Node\Stmt\TraitUse;
-            }, [$classNode]);
-        }
-
         // add the new property after this node
         if ($targetNode) {
             $index = array_search($targetNode, $classNode->stmts);
@@ -1287,13 +1192,6 @@ final class ClassSourceManipulator
     {
         if (null !== $this->io) {
             $this->io->text($note);
-        }
-    }
-
-    private function addMethodParams(Builder\Method $methodBuilder, array $params)
-    {
-        foreach ($params as $param) {
-            $methodBuilder->addParam($param);
         }
     }
 }

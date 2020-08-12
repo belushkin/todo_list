@@ -10,7 +10,7 @@ use Doctrine\DBAL\Schema\AbstractAsset;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\Generator\Exception\NoChangesDetected;
-use Doctrine\Migrations\Provider\SchemaProvider;
+use Doctrine\Migrations\Provider\SchemaProviderInterface;
 use function preg_match;
 use function strpos;
 use function substr;
@@ -29,7 +29,7 @@ class DiffGenerator
     /** @var AbstractSchemaManager */
     private $schemaManager;
 
-    /** @var SchemaProvider */
+    /** @var SchemaProviderInterface */
     private $schemaProvider;
 
     /** @var AbstractPlatform */
@@ -44,7 +44,7 @@ class DiffGenerator
     public function __construct(
         DBALConfiguration $dbalConfiguration,
         AbstractSchemaManager $schemaManager,
-        SchemaProvider $schemaProvider,
+        SchemaProviderInterface $schemaProvider,
         AbstractPlatform $platform,
         Generator $migrationGenerator,
         SqlGenerator $migrationSqlGenerator
@@ -61,7 +61,7 @@ class DiffGenerator
      * @throws NoChangesDetected
      */
     public function generate(
-        string $fqcn,
+        string $versionNumber,
         ?string $filterExpression,
         bool $formatted = false,
         int $lineLength = 120,
@@ -102,7 +102,7 @@ class DiffGenerator
         }
 
         return $this->migrationGenerator->generateMigration(
-            $fqcn,
+            $versionNumber,
             $up,
             $down
         );

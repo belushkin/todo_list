@@ -21,7 +21,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
  */
 class UnusedTagsPass implements CompilerPassInterface
 {
-    private $knownTags = [
+    private $whitelist = [
         'annotations.cached_reader',
         'auto_alias',
         'cache.pool',
@@ -32,14 +32,10 @@ class UnusedTagsPass implements CompilerPassInterface
         'container.env_var_loader',
         'container.env_var_processor',
         'container.hot_path',
-        'container.no_preload',
-        'container.preload',
-        'container.private',
         'container.reversible',
         'container.service_locator',
         'container.service_locator_context',
         'container.service_subscriber',
-        'container.stack',
         'controller.argument_value_resolver',
         'controller.service_arguments',
         'data_collector',
@@ -54,7 +50,6 @@ class UnusedTagsPass implements CompilerPassInterface
         'kernel.fragment_renderer',
         'kernel.locale_aware',
         'kernel.reset',
-        'ldap',
         'mailer.transport_factory',
         'messenger.bus',
         'messenger.message_handler',
@@ -68,7 +63,6 @@ class UnusedTagsPass implements CompilerPassInterface
         'property_info.list_extractor',
         'property_info.type_extractor',
         'proxy',
-        'routing.expression_language_function',
         'routing.expression_language_provider',
         'routing.loader',
         'routing.route_loader',
@@ -91,11 +85,11 @@ class UnusedTagsPass implements CompilerPassInterface
 
     public function process(ContainerBuilder $container)
     {
-        $tags = array_unique(array_merge($container->findTags(), $this->knownTags));
+        $tags = array_unique(array_merge($container->findTags(), $this->whitelist));
 
         foreach ($container->findUnusedTags() as $tag) {
-            // skip known tags
-            if (\in_array($tag, $this->knownTags)) {
+            // skip whitelisted tags
+            if (\in_array($tag, $this->whitelist)) {
                 continue;
             }
 

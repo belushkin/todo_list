@@ -41,9 +41,9 @@ class Resolver implements ResolverInterface
     {
         $options = [];
         foreach ($this->providers as $provider) {
-            $options[] = $provider->getOptions($request);
+            $options = array_merge($options, $provider->getOptions($request));
         }
 
-        return array_merge(...$options);
+        return $options;
     }
 }

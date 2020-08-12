@@ -77,8 +77,11 @@ You can pass attributes to tweak the output:
 
 .. code-block:: twig
 
-    {# 12.3% #}
-    {{ '0.12345'|format_percent_number({rounding_mode: 'floor', fraction_digit: 1}) }}
+    {# €12.34 #}
+    {{ '12.345'|format_number('EUR', {rounding_mode: 'floor'}) }}
+
+    {# €1,000,000.0000 #}
+    {{ '1000000'|format_number('EUR', {fraction_digit: 4}) }}
 
 By default, the filter uses the current locale. You can pass it explicitly:
 
@@ -97,7 +100,7 @@ By default, the filter uses the current locale. You can pass it explicitly:
         $ composer req twig/intl-extra
 
     Then, use the ``twig/extra-bundle`` on Symfony projects or add the extension
-    explicitly on the Twig environment::
+    explictly on the Twig environment::
 
         use Twig\Extra\Intl\IntlExtension;
 

@@ -36,12 +36,12 @@ final class ParameterBagUtils
     public static function getParameterBagValue(ParameterBag $parameters, string $path)
     {
         if (false === $pos = strpos($path, '[')) {
-            return $parameters->all()[$path] ?? null;
+            return $parameters->get($path);
         }
 
         $root = substr($path, 0, $pos);
 
-        if (null === $value = $parameters->all()[$root] ?? null) {
+        if (null === $value = $parameters->get($root)) {
             return null;
         }
 

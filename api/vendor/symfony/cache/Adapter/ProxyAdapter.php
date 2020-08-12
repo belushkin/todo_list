@@ -33,7 +33,6 @@ class ProxyAdapter implements AdapterInterface, CacheInterface, PruneableInterfa
     private $createCacheItem;
     private $setInnerItem;
     private $poolHash;
-    private $defaultLifetime;
 
     public function __construct(CacheItemPoolInterface $pool, string $namespace = '', int $defaultLifetime = 0)
     {
@@ -41,9 +40,8 @@ class ProxyAdapter implements AdapterInterface, CacheInterface, PruneableInterfa
         $this->poolHash = $poolHash = spl_object_hash($pool);
         $this->namespace = '' === $namespace ? '' : CacheItem::validateKey($namespace);
         $this->namespaceLen = \strlen($namespace);
-        $this->defaultLifetime = $defaultLifetime;
         $this->createCacheItem = \Closure::bind(
-            static function ($key, $innerItem) use ($poolHash) {
+            static function ($key, $innerItem) use ($defaultLifetime, $poolHash) {
                 $item = new CacheItem();
                 $item->key = $key;
 
@@ -54,6 +52,7 @@ class ProxyAdapter implements AdapterInterface, CacheInterface, PruneableInterfa
                 $item->value = $v = $innerItem->get();
                 $item->isHit = $innerItem->isHit();
                 $item->innerItem = $innerItem;
+                $item->defaultLifetime = $defaultLifetime;
                 $item->poolHash = $poolHash;
 
                 // Detect wrapped values that encode for their expiry and creation duration
@@ -224,8 +223,8 @@ class ProxyAdapter implements AdapterInterface, CacheInterface, PruneableInterfa
             return false;
         }
         $item = (array) $item;
-        if (null === $item["\0*\0expiry"] && 0 < $this->defaultLifetime) {
-            $item["\0*\0expiry"] = microtime(true) + $this->defaultLifetime;
+        if (null === $item["\0*\0expiry"] && 0 < $item["\0*\0defaultLifetime"]) {
+            $item["\0*\0expiry"] = microtime(true) + $item["\0*\0defaultLifetime"];
         }
 
         if ($item["\0*\0poolHash"] === $this->poolHash && $item["\0*\0innerItem"]) {

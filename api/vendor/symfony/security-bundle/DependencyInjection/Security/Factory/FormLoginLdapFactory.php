@@ -22,13 +22,9 @@ use Symfony\Component\Security\Core\Exception\LogicException;
  *
  * @author Grégoire Pineau <lyrixx@lyrixx.info>
  * @author Charles Sarrazin <charles@sarraz.in>
- *
- * @internal
  */
 class FormLoginLdapFactory extends FormLoginFactory
 {
-    use LdapFactoryTrait;
-
     protected function createAuthProvider(ContainerBuilder $container, string $id, array $config, string $userProviderId)
     {
         $provider = 'security.authentication.provider.ldap_bind.'.$id;

@@ -12,17 +12,14 @@
 namespace Symfony\Bundle\SecurityBundle\DependencyInjection\Security\Factory;
 
 use Symfony\Component\Config\Definition\Builder\NodeDefinition;
-use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Parameter;
 
 /**
  * @author Wouter de Jong <wouter@wouterj.nl>
- *
- * @internal
  */
-class AnonymousFactory implements SecurityFactoryInterface, AuthenticatorFactoryInterface
+class AnonymousFactory implements SecurityFactoryInterface
 {
     public function create(ContainerBuilder $container, $id, $config, $userProvider, $defaultEntryPoint)
     {
@@ -45,11 +42,6 @@ class AnonymousFactory implements SecurityFactoryInterface, AuthenticatorFactory
         return [$providerId, $listenerId, $defaultEntryPoint];
     }
 
-    public function createAuthenticator(ContainerBuilder $container, string $firewallName, array $config, string $userProviderId): string
-    {
-        throw new InvalidConfigurationException(sprintf('The authenticator manager no longer has "anonymous" security. Please remove this option under the "%s" firewall'.($config['lazy'] ? ' and add "lazy: true"' : '').'.', $firewallName));
-    }
-
     public function getPosition()
     {
         return 'anonymous';
@@ -68,7 +60,7 @@ class AnonymousFactory implements SecurityFactoryInterface, AuthenticatorFactory
                 ->then(function ($v) { return ['lazy' => true]; })
             ->end()
             ->children()
-                ->booleanNode('lazy')->defaultFalse()->setDeprecated('symfony/security-bundle', '5.1', 'Using "anonymous: lazy" to make the firewall lazy is deprecated, use "anonymous: true" and "lazy: true" instead.')->end()
+                ->booleanNode('lazy')->defaultFalse()->end()
                 ->scalarNode('secret')->defaultNull()->end()
             ->end()
         ;

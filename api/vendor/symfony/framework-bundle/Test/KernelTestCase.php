@@ -23,8 +23,6 @@ use Symfony\Contracts\Service\ResetInterface;
  */
 abstract class KernelTestCase extends TestCase
 {
-    use MailerAssertionsTrait;
-
     protected static $class;
 
     /**

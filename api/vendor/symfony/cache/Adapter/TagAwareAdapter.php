@@ -49,6 +49,7 @@ class TagAwareAdapter implements TagAwareAdapterInterface, TagAwareCacheInterfac
                 $item = new CacheItem();
                 $item->key = $key;
                 $item->value = $value;
+                $item->defaultLifetime = $protoItem->defaultLifetime;
                 $item->expiry = $protoItem->expiry;
                 $item->poolHash = $protoItem->poolHash;
 
@@ -93,7 +94,8 @@ class TagAwareAdapter implements TagAwareAdapterInterface, TagAwareCacheInterfac
         $this->invalidateTags = \Closure::bind(
             static function (AdapterInterface $tagsAdapter, array $tags) {
                 foreach ($tags as $v) {
-                    $v->expiry = 0;
+                    $v->defaultLifetime = 0;
+                    $v->expiry = null;
                     $tagsAdapter->saveDeferred($v);
                 }
 

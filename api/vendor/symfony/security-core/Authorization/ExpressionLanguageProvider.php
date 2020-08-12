@@ -25,21 +25,21 @@ class ExpressionLanguageProvider implements ExpressionFunctionProviderInterface
     {
         return [
             new ExpressionFunction('is_anonymous', function () {
-                return '$token && $auth_checker->isGranted("IS_ANONYMOUS")';
+                return '$trust_resolver->isAnonymous($token)';
             }, function (array $variables) {
-                return $variables['token'] && $variables['auth_checker']->isGranted('IS_ANONYMOUS');
+                return $variables['trust_resolver']->isAnonymous($variables['token']);
             }),
 
             new ExpressionFunction('is_authenticated', function () {
-                return '$token && !$auth_checker->isGranted("IS_ANONYMOUS")';
+                return '$token && !$trust_resolver->isAnonymous($token)';
             }, function (array $variables) {
-                return $variables['token'] && !$variables['auth_checker']->isGranted('IS_ANONYMOUS');
+                return $variables['token'] && !$variables['trust_resolver']->isAnonymous($variables['token']);
             }),
 
             new ExpressionFunction('is_fully_authenticated', function () {
-                return '$token && $auth_checker->isGranted("IS_AUTHENTICATED_FULLY")';
+                return '$trust_resolver->isFullFledged($token)';
             }, function (array $variables) {
-                return $variables['token'] && $variables['auth_checker']->isGranted('IS_AUTHENTICATED_FULLY');
+                return $variables['trust_resolver']->isFullFledged($variables['token']);
             }),
 
             new ExpressionFunction('is_granted', function ($attributes, $object = 'null') {
@@ -49,9 +49,9 @@ class ExpressionLanguageProvider implements ExpressionFunctionProviderInterface
             }),
 
             new ExpressionFunction('is_remember_me', function () {
-                return '$token && $auth_checker->isGranted("IS_REMEMBERED")';
+                return '$trust_resolver->isRememberMe($token)';
             }, function (array $variables) {
-                return $variables['token'] && $variables['auth_checker']->isGranted('IS_REMEMBERED');
+                return $variables['trust_resolver']->isRememberMe($variables['token']);
             }),
         ];
     }

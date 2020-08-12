@@ -40,9 +40,9 @@ You can also use the filter on an included file:
         $ composer req twig/markdown-extra
 
     Then, use the ``twig/extra-bundle`` on Symfony projects or add the extension
-    explicitly on the Twig environment::
+    explictly on the Twig environment::
 
-        use Twig\Extra\Markdown\MarkdownExtension;
+        use Twig\Extra\Markdown\MarkdownMarkdownExtension;
 
         $twig = new \Twig\Environment(...);
         $twig->addExtension(new MarkdownExtension());

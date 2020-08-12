@@ -33,14 +33,12 @@ class RouterMatchCommand extends Command
     protected static $defaultName = 'router:match';
 
     private $router;
-    private $expressionLanguageProviders;
 
-    public function __construct(RouterInterface $router, iterable $expressionLanguageProviders = [])
+    public function __construct(RouterInterface $router)
     {
         parent::__construct();
 
         $this->router = $router;
-        $this->expressionLanguageProviders = $expressionLanguageProviders;
     }
 
     /**
@@ -89,9 +87,6 @@ EOF
         }
 
         $matcher = new TraceableUrlMatcher($this->router->getRouteCollection(), $context);
-        foreach ($this->expressionLanguageProviders as $provider) {
-            $matcher->addExpressionLanguageProvider($provider);
-        }
 
         $traces = $matcher->getTraces($input->getArgument('path_info'));
 

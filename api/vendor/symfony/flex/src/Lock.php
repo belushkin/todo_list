@@ -77,11 +77,6 @@ class Lock
         }
     }
 
-    public function delete()
-    {
-        @unlink($this->json->getPath());
-    }
-
     public function all(): array
     {
         return $this->lock;

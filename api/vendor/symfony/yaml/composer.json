@@ -16,8 +16,7 @@
         }
     ],
     "require": {
-        "php": ">=7.2.5",
-        "symfony/deprecation-contracts": "^2.1",
+        "php": "^7.2.5",
         "symfony/polyfill-ctype": "~1.8"
     },
     "require-dev": {
@@ -35,13 +34,10 @@
             "/Tests/"
         ]
     },
-    "bin": [
-        "Resources/bin/yaml-lint"
-    ],
     "minimum-stability": "dev",
     "extra": {
         "branch-alias": {
-            "dev-master": "5.1-dev"
+            "dev-master": "5.0-dev"
         }
     }
 }

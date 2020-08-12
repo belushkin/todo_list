@@ -33,8 +33,6 @@ use Symfony\Component\Routing\RouterInterface;
  */
 class RouterDebugCommand extends Command
 {
-    use BuildDebugContainerTrait;
-
     protected static $defaultName = 'debug:router';
     private $router;
     private $fileLinkFormatter;
@@ -81,7 +79,6 @@ EOF
         $name = $input->getArgument('name');
         $helper = new DescriptorHelper($this->fileLinkFormatter);
         $routes = $this->router->getRouteCollection();
-        $container = $this->fileLinkFormatter ? \Closure::fromCallable([$this, 'getContainerBuilder']) : null;
 
         if ($name) {
             if (!($route = $routes->get($name)) && $matchingRoutes = $this->findRouteNameContaining($name, $routes)) {
@@ -99,7 +96,6 @@ EOF
                 'raw_text' => $input->getOption('raw'),
                 'name' => $name,
                 'output' => $io,
-                'container' => $container,
             ]);
         } else {
             $helper->describe($io, $routes, [
@@ -107,7 +103,6 @@ EOF
                 'raw_text' => $input->getOption('raw'),
                 'show_controllers' => $input->getOption('show-controllers'),
                 'output' => $io,
-                'container' => $container,
             ]);
         }
 

@@ -105,18 +105,10 @@ abstract class Constraint
      */
     public function __construct($options = null)
     {
-        foreach ($this->normalizeOptions($options) as $name => $value) {
-            $this->$name = $value;
-        }
-    }
-
-    protected function normalizeOptions($options): array
-    {
-        $normalizedOptions = [];
         $defaultOption = $this->getDefaultOption();
         $invalidOptions = [];
         $missingOptions = array_flip((array) $this->getRequiredOptions());
-        $knownOptions = get_class_vars(static::class);
+        $knownOptions = get_object_vars($this);
 
         // The "groups" option is added to the object lazily
         $knownOptions['groups'] = true;
@@ -136,7 +128,7 @@ abstract class Constraint
         if ($options && \is_array($options) && \is_string(key($options))) {
             foreach ($options as $option => $value) {
                 if (\array_key_exists($option, $knownOptions)) {
-                    $normalizedOptions[$option] = $value;
+                    $this->$option = $value;
                     unset($missingOptions[$option]);
                 } else {
                     $invalidOptions[] = $option;
@@ -148,7 +140,7 @@ abstract class Constraint
             }
 
             if (\array_key_exists($defaultOption, $knownOptions)) {
-                $normalizedOptions[$defaultOption] = $options;
+                $this->$defaultOption = $options;
                 unset($missingOptions[$defaultOption]);
             } else {
                 $invalidOptions[] = $defaultOption;
@@ -162,8 +154,6 @@ abstract class Constraint
         if (\count($missingOptions) > 0) {
             throw new MissingOptionsException(sprintf('The options "%s" must be set for constraint "%s".', implode('", "', array_keys($missingOptions)), static::class), array_keys($missingOptions));
         }
-
-        return $normalizedOptions;
     }
 
     /**

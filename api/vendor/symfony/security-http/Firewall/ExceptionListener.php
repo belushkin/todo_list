@@ -111,7 +111,7 @@ class ExceptionListener
             }
 
             if ($exception instanceof LogoutException) {
-                $this->handleLogoutException($event, $exception);
+                $this->handleLogoutException($exception);
 
                 return;
             }
@@ -144,9 +144,7 @@ class ExceptionListener
 
             try {
                 $insufficientAuthenticationException = new InsufficientAuthenticationException('Full authentication is required to access this resource.', 0, $exception);
-                if (null !== $token) {
-                    $insufficientAuthenticationException->setToken($token);
-                }
+                $insufficientAuthenticationException->setToken($token);
 
                 $event->setResponse($this->startAuthentication($event->getRequest(), $insufficientAuthenticationException));
             } catch (\Exception $e) {
@@ -183,12 +181,10 @@ class ExceptionListener
         }
     }
 
-    private function handleLogoutException(ExceptionEvent $event, LogoutException $exception): void
+    private function handleLogoutException(LogoutException $exception): void
     {
-        $event->setThrowable(new AccessDeniedHttpException($exception->getMessage(), $exception));
-
         if (null !== $this->logger) {
-            $this->logger->info('A LogoutException was thrown; wrapping with AccessDeniedHttpException', ['exception' => $exception]);
+            $this->logger->info('A LogoutException was thrown.', ['exception' => $exception]);
         }
     }
 
@@ -218,9 +214,9 @@ class ExceptionListener
         $response = $this->authenticationEntryPoint->start($request, $authException);
 
         if (!$response instanceof Response) {
-            $given = get_debug_type($response);
+            $given = \is_object($response) ? \get_class($response) : \gettype($response);
 
-            throw new \LogicException(sprintf('The "%s::start()" method must return a Response object ("%s" returned).', get_debug_type($this->authenticationEntryPoint), $given));
+            throw new \LogicException(sprintf('The "%s::start()" method must return a Response object ("%s" returned).', \get_class($this->authenticationEntryPoint), $given));
         }
 
         return $response;
