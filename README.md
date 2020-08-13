@@ -10,8 +10,14 @@ Api platform utilize Symfony entities annotations for managing API resources so 
 - https://api-platform.com/
 
 ## How application looks like:
+
+TODO List visualization:
 ![alt text](./api/assets/img/image_1.png)
+
+REST API:
 ![alt text](./api/assets/img/image_2.png)
+
+Admin page:
 ![alt text](./api/assets/img/image_3.png)
 
 ### Requirements of the assessment:
